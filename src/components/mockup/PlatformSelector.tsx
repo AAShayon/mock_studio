@@ -26,24 +26,24 @@ export function PlatformSelector() {
             className={cn(
               'group flex flex-col items-start gap-1 rounded-xl border p-3 text-left transition-all',
               active
-                ? 'border-primary bg-primary/5 shadow-sm'
-                : 'border-border bg-card hover:border-primary/40 hover:bg-accent/40',
+                ? 'border-indigo-400 bg-indigo-500/20 shadow-sm'
+                : 'border-white/10 bg-white/5 hover:border-indigo-400/40 hover:bg-white/10',
             )}
           >
             <div className="flex items-center gap-2">
               <span
                 className={cn(
                   'flex h-8 w-8 items-center justify-center rounded-lg transition-colors',
-                  active
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted text-muted-foreground group-hover:bg-accent',
+                    active
+                    ? 'bg-indigo-500 text-white'
+                    : 'bg-white/10 text-white/60 group-hover:bg-white/20',
                 )}
               >
                 <Smartphone className="h-4 w-4" />
               </span>
-              <span className="text-sm font-semibold">{p.label}</span>
+              <span className="text-sm font-semibold text-white">{p.label}</span>
             </div>
-            <span className="text-[11px] leading-tight text-muted-foreground">
+            <span className="text-[11px] leading-tight text-white/50">
               {p.sub}
             </span>
           </button>

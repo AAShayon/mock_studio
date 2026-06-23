@@ -1,13 +1,14 @@
 'use client'
 
 import { useMockupStore, useCurrentTemplate } from '@/store/mockup-store'
-import type { BackgroundStyle, FitMode } from '@/lib/mockup/types'
+import type { BackgroundStyle, CanvasOrientation, DesignStyleId, FitMode } from '@/lib/mockup/types'
+import { DESIGN_STYLES } from '@/lib/mockup/types'
 import { exportCanvas } from '@/lib/mockup/renderer'
 import { useImageElements } from '@/hooks/use-loaded-images'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
-import { Download, Sparkles } from 'lucide-react'
+import { Download, Sparkles, RotateCw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 
@@ -70,6 +71,15 @@ export function ControlPanel() {
   const setFitMode = useMockupStore((s) => s.setFitMode)
   const exportFormat = useMockupStore((s) => s.exportFormat)
   const setExportFormat = useMockupStore((s) => s.setExportFormat)
+  const designStyleId = useMockupStore((s) => s.designStyleId)
+  const setDesignStyleId = useMockupStore((s) => s.setDesignStyleId)
+  const canvasOrientation = useMockupStore((s) => s.canvasOrientation)
+  const setCanvasOrientation = useMockupStore((s) => s.setCanvasOrientation)
+  const slotTexts = useMockupStore((s) => s.slotTexts)
+  const canvasWidth = useMockupStore((s) => s.canvasWidth)
+  const canvasHeight = useMockupStore((s) => s.canvasHeight)
+  const setCanvasSize = useMockupStore((s) => s.setCanvasSize)
+  const showCanvasSize = template.id === 'custom'
 
   const slotCount = template.imageCount
   const padded: ({ id: string; src: string } | null)[] = Array.from(
@@ -91,6 +101,8 @@ export function ControlPanel() {
         background,
         fitMode,
         exportFormat,
+        designStyleId,
+        slotTexts,
       )
       const a = document.createElement('a')
       a.href = dataUrl
@@ -110,13 +122,114 @@ export function ControlPanel() {
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Design Style */}
+      <div className="flex flex-col gap-2">
+        <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Frame Color
+        </Label>
+        <div className="grid grid-cols-5 gap-1.5">
+          {DESIGN_STYLES.map((ds) => (
+            <button
+              key={ds.id}
+              type="button"
+              title={ds.name}
+              onClick={() => setDesignStyleId(ds.id)}
+              className={cn(
+                'flex flex-col items-center gap-1',
+              )}
+            >
+              <span
+                className={cn(
+                  'h-8 w-full rounded-md border shadow-sm transition-transform hover:scale-105',
+                  designStyleId === ds.id && 'ring-2 ring-indigo-500 ring-offset-1 dark:ring-offset-neutral-900',
+                )}
+                style={{
+                  background: `linear-gradient(180deg, ${ds.bodyTop}, ${ds.bodyBottom})`,
+                }}
+              />
+              <span className="text-[9px] text-muted-foreground">{ds.name}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Canvas Orientation */}
+      <div className="flex flex-col gap-2">
+        <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Canvas Orientation
+        </Label>
+        <div className="flex gap-1 rounded-full border bg-neutral-100 p-0.5 dark:bg-neutral-800">
+          {(['portrait', 'landscape'] as CanvasOrientation[]).map((o) => (
+            <button
+              key={o}
+              type="button"
+              onClick={() => setCanvasOrientation(o)}
+              className={cn(
+                'flex flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium capitalize transition-all',
+                canvasOrientation === o
+                  ? 'bg-white text-neutral-900 shadow-xs dark:bg-neutral-700 dark:text-white'
+                  : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white',
+              )}
+            >
+              <RotateCw className={cn('h-3 w-3', o === 'landscape' && 'rotate-90')} />
+              {o}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Canvas Size */}
+      {showCanvasSize && (
+        <div className="flex flex-col gap-2">
+          <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Canvas Size
+          </Label>
+          <div className="flex flex-col gap-2 rounded-lg border bg-card/50 p-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-muted-foreground">Width</span>
+              <span className="font-mono text-[10px] text-muted-foreground">{canvasWidth}px</span>
+            </div>
+            <Slider
+              value={[canvasWidth]}
+              min={600}
+              max={4800}
+              step={100}
+              onValueChange={([v]) => setCanvasSize(v, canvasHeight)}
+            />
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-muted-foreground">Height</span>
+              <span className="font-mono text-[10px] text-muted-foreground">{canvasHeight}px</span>
+            </div>
+            <Slider
+              value={[canvasHeight]}
+              min={600}
+              max={4800}
+              step={100}
+              onValueChange={([v]) => setCanvasSize(canvasWidth, v)}
+            />
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {[800, 1200, 1800, 2400, 3600].map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setCanvasSize(s, s)}
+                  className="rounded-full border px-2.5 py-1 text-[9px] font-medium text-muted-foreground hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                >
+                  {s}×{s}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Background */}
       <div className="flex flex-col gap-2.5">
         <div className="flex items-center justify-between">
           <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Background
           </Label>
-          <div className="flex overflow-hidden rounded-md border">
+          <div className="flex gap-1 rounded-full border bg-neutral-100 p-0.5 dark:bg-neutral-800">
             <button
               type="button"
               onClick={() =>
@@ -130,10 +243,10 @@ export function ControlPanel() {
                 )
               }
               className={cn(
-                'px-2 py-1 text-[10px] font-medium transition-colors',
+                'rounded-full px-3 py-1 text-[10px] font-medium transition-all',
                 !isGradient
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-card text-muted-foreground hover:bg-accent',
+                  ? 'bg-white text-neutral-900 shadow-xs dark:bg-neutral-700 dark:text-white'
+                  : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white',
               )}
             >
               Solid
@@ -153,10 +266,10 @@ export function ControlPanel() {
                 )
               }
               className={cn(
-                'px-2 py-1 text-[10px] font-medium transition-colors',
+                'rounded-full px-3 py-1 text-[10px] font-medium transition-all',
                 isGradient
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-card text-muted-foreground hover:bg-accent',
+                  ? 'bg-white text-neutral-900 shadow-xs dark:bg-neutral-700 dark:text-white'
+                  : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white',
               )}
             >
               Gradient
@@ -236,29 +349,26 @@ export function ControlPanel() {
         <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Image Fit
         </Label>
-        <div className="grid grid-cols-3 gap-1.5">
-          {FIT_MODES.map((m) => {
-            const active = fitMode === m.id
-            return (
-              <button
-                key={m.id}
-                type="button"
-                onClick={() => setFitMode(m.id)}
-                className={cn(
-                  'flex flex-col items-center gap-0.5 rounded-lg border p-2 transition-colors',
-                  active
-                    ? 'border-primary bg-primary/5'
-                    : 'border-border bg-card hover:bg-accent/40',
-                )}
-              >
-                <span className="text-xs font-semibold">{m.label}</span>
-                <span className="text-[9px] text-muted-foreground">
-                  {m.hint}
-                </span>
-              </button>
-            )
-          })}
-        </div>
+          <div className="flex gap-1 rounded-full border bg-neutral-100 p-0.5 dark:bg-neutral-800">
+            {FIT_MODES.map((m) => {
+              const active = fitMode === m.id
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => setFitMode(m.id)}
+                  className={cn(
+                    'flex-1 rounded-full px-3 py-1.5 text-xs font-medium transition-all',
+                    active
+                      ? 'bg-white text-neutral-900 shadow-xs dark:bg-neutral-700 dark:text-white'
+                      : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white',
+                  )}
+                >
+                  {m.label}
+                </button>
+              )
+            })}
+          </div>
       </div>
 
       {/* Export format */}
@@ -266,26 +376,23 @@ export function ControlPanel() {
         <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Export Format
         </Label>
-        <div className="flex overflow-hidden rounded-lg border">
-          {(['png', 'jpeg'] as const).map((f) => (
-            <button
-              key={f}
-              type="button"
-              onClick={() => setExportFormat(f)}
-              className={cn(
-                'flex-1 py-2 text-xs font-medium transition-colors',
-                exportFormat === f
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-card text-muted-foreground hover:bg-accent',
-              )}
-            >
-              {f.toUpperCase()}
-              {f === 'png' && (
-                <span className="ml-1 text-[9px] opacity-70">transparent-capable</span>
-              )}
-            </button>
-          ))}
-        </div>
+          <div className="flex gap-1 rounded-full border bg-neutral-100 p-0.5 dark:bg-neutral-800">
+            {(['png', 'jpeg'] as const).map((f) => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => setExportFormat(f)}
+                className={cn(
+                  'flex-1 rounded-full px-3 py-1.5 text-xs font-medium transition-all',
+                  exportFormat === f
+                    ? 'bg-white text-neutral-900 shadow-xs dark:bg-neutral-700 dark:text-white'
+                    : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white',
+                )}
+              >
+                {f.toUpperCase()}
+              </button>
+            ))}
+          </div>
       </div>
 
       {/* Download */}

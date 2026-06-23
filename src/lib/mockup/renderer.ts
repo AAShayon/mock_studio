@@ -1,21 +1,15 @@
 import type {
   BackgroundStyle,
+  CanvasOrientation,
+  DesignStyleId,
   DeviceFrame,
   FitMode,
   MockupTemplate,
+  SlotText,
 } from './types'
+import { DESIGN_STYLES } from './types'
 
-// ---- Low-level canvas helpers ----
-
-// Add a rounded-rect subpath to the CURRENT path (does not call beginPath).
-function addRoundedRect(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  r: number,
-) {
+function addRoundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   const radius = Math.min(r, w / 2, h / 2)
   ctx.moveTo(x + radius, y)
   ctx.arcTo(x + w, y, x + w, y + h, radius)
@@ -25,34 +19,19 @@ function addRoundedRect(
   ctx.closePath()
 }
 
-// Begin a fresh path with a single rounded rect.
-function roundedRectPath(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  r: number,
-) {
+function roundedRectPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   ctx.beginPath()
   addRoundedRect(ctx, x, y, w, h, r)
 }
 
-function drawBackground(
-  ctx: CanvasRenderingContext2D,
-  w: number,
-  h: number,
-  bg: BackgroundStyle,
-) {
+function drawBackground(ctx: CanvasRenderingContext2D, w: number, h: number, bg: BackgroundStyle) {
   if (bg.type === 'solid') {
     ctx.fillStyle = bg.color
     ctx.fillRect(0, 0, w, h)
     return
   }
-  // gradient
   const angle = (bg.angle * Math.PI) / 180
-  const cx = w / 2
-  const cy = h / 2
+  const cx = w / 2; const cy = h / 2
   const len = Math.abs(Math.cos(angle)) * w + Math.abs(Math.sin(angle)) * h
   const dx = (Math.cos(angle) * len) / 2
   const dy = (Math.sin(angle) * len) / 2
@@ -63,94 +42,51 @@ function drawBackground(
   ctx.fillRect(0, 0, w, h)
 }
 
-// Draw an image into a box using the given fit mode (cover crops, contain letterboxes, stretch distorts)
-function drawImageFit(
-  ctx: CanvasRenderingContext2D,
-  img: CanvasImageSource,
-  sw: number,
-  sh: number,
-  boxX: number,
-  boxY: number,
-  boxW: number,
-  boxH: number,
-  mode: FitMode,
-) {
-  if (mode === 'stretch') {
-    ctx.drawImage(img, boxX, boxY, boxW, boxH)
-    return
-  }
+function drawImageFit(ctx: CanvasRenderingContext2D, img: CanvasImageSource, sw: number, sh: number, boxX: number, boxY: number, boxW: number, boxH: number, mode: FitMode) {
+  if (mode === 'stretch') { ctx.drawImage(img, boxX, boxY, boxW, boxH); return }
   const imgRatio = sw / sh
   const boxRatio = boxW / boxH
-  let drawW: number
-  let drawH: number
+  let drawW: number, drawH: number
   if (mode === 'cover') {
-    if (imgRatio > boxRatio) {
-      drawH = boxH
-      drawW = boxH * imgRatio
-    } else {
-      drawW = boxW
-      drawH = boxW / imgRatio
-    }
+    if (imgRatio > boxRatio) { drawH = boxH; drawW = boxH * imgRatio }
+    else { drawW = boxW; drawH = boxW / imgRatio }
   } else {
-    // contain
-    if (imgRatio > boxRatio) {
-      drawW = boxW
-      drawH = boxW / imgRatio
-    } else {
-      drawH = boxH
-      drawW = boxH * imgRatio
-    }
+    if (imgRatio > boxRatio) { drawW = boxW; drawH = boxW / imgRatio }
+    else { drawH = boxH; drawW = boxH * imgRatio }
   }
-  const dx = boxX + (boxW - drawW) / 2
-  const dy = boxY + (boxH - drawH) / 2
-  ctx.drawImage(img, dx, dy, drawW, drawH)
+  ctx.drawImage(img, boxX + (boxW - drawW) / 2, boxY + (boxH - drawH) / 2, drawW, drawH)
 }
 
-// ---- Device frame drawing ----
-
-function drawDeviceFrame(
-  ctx: CanvasRenderingContext2D,
-  frame: DeviceFrame,
-  scale: number,
-  shadow: boolean,
-) {
+function drawDeviceFrame(ctx: CanvasRenderingContext2D, frame: DeviceFrame, scale: number, shadow: boolean, designStyleId: DesignStyleId) {
   const W = frame.frameW * scale
   const H = frame.frameH * scale
   const r = frame.frameRadius * scale
-  // Screen hole geometry
-  const sx = frame.screenX * scale
-  const sy = frame.screenY * scale
-  const sw = frame.screenW * scale
-  const sh = frame.screenH * scale
+  const sx = frame.screenX * scale; const sy = frame.screenY * scale
+  const sw = frame.screenW * scale; const sh = frame.screenH * scale
   const sr = frame.screenRadius * scale
+  const ds = DESIGN_STYLES.find(d => d.id === designStyleId) ?? DESIGN_STYLES[0]
 
   ctx.save()
-
-  // Drop shadow under the body (full body outline)
   if (shadow) {
     ctx.save()
     roundedRectPath(ctx, 0, 0, W, H, r)
     ctx.shadowColor = 'rgba(0,0,0,0.45)'
     ctx.shadowBlur = 60 * scale
     ctx.shadowOffsetY = 30 * scale
-    ctx.fillStyle = frame.bodyEdge
+    ctx.fillStyle = ds.bodyEdge
     ctx.fill()
     ctx.restore()
   }
 
-  // Body bezel with a screen hole punched out (even-odd fill).
-  // The screen content (image) was already drawn underneath and shows
-  // through the hole.
   ctx.beginPath()
   addRoundedRect(ctx, 0, 0, W, H, r)
   addRoundedRect(ctx, sx, sy, sw, sh, sr)
   const bodyGrad = ctx.createLinearGradient(0, 0, 0, H)
-  bodyGrad.addColorStop(0, frame.bodyTop)
-  bodyGrad.addColorStop(1, frame.bodyBottom)
+  bodyGrad.addColorStop(0, ds.bodyTop)
+  bodyGrad.addColorStop(1, ds.bodyBottom)
   ctx.fillStyle = bodyGrad
   ctx.fill('evenodd')
 
-  // Inner edge highlight (subtle top sheen) clipped to the bezel only
   ctx.save()
   ctx.beginPath()
   addRoundedRect(ctx, 0, 0, W, H, r)
@@ -163,168 +99,95 @@ function drawDeviceFrame(
   ctx.fillRect(0, 0, W, H * 0.25)
   ctx.restore()
 
-  // Thin inner border around the screen for definition
   roundedRectPath(ctx, sx, sy, sw, sh, sr)
   ctx.strokeStyle = 'rgba(0,0,0,0.55)'
   ctx.lineWidth = Math.max(1, 2 * scale)
   ctx.stroke()
 
-  // Thin outer stroke for definition
   roundedRectPath(ctx, 0.5, 0.5, W - 1, H - 1, r)
-  ctx.strokeStyle = frame.bodyEdge
+  ctx.strokeStyle = ds.bodyEdge
   ctx.lineWidth = 1
   ctx.stroke()
-
   ctx.restore()
 }
 
-function drawDeviceNotch(
-  ctx: CanvasRenderingContext2D,
-  frame: DeviceFrame,
-  scale: number,
-) {
+function drawDeviceNotch(ctx: CanvasRenderingContext2D, frame: DeviceFrame, scale: number) {
   const cx = (frame.frameW * scale) / 2
   if (frame.notch.kind === 'island') {
-    const w = frame.notch.width * scale
-    const h = frame.notch.height * scale
-    const y = frame.notch.topOffset * scale
-    const x = cx - w / 2
+    const w = frame.notch.width * scale; const h = frame.notch.height * scale
+    const y = frame.notch.topOffset * scale; const x = cx - w / 2
     ctx.save()
-    // Subtle shadow under island
     roundedRectPath(ctx, x, y, w, h, h / 2)
-    ctx.fillStyle = '#000'
-    ctx.fill()
-    // Tiny camera dot
-    ctx.beginPath()
-    ctx.arc(x + w * 0.82, y + h / 2, h * 0.16, 0, Math.PI * 2)
-    ctx.fillStyle = '#0c0c10'
-    ctx.fill()
-    ctx.beginPath()
-    ctx.arc(x + w * 0.82, y + h / 2, h * 0.08, 0, Math.PI * 2)
-    ctx.fillStyle = '#1a1a2a'
-    ctx.fill()
+    ctx.fillStyle = '#000'; ctx.fill()
+    ctx.beginPath(); ctx.arc(x + w * 0.82, y + h / 2, h * 0.16, 0, Math.PI * 2)
+    ctx.fillStyle = '#0c0c10'; ctx.fill()
+    ctx.beginPath(); ctx.arc(x + w * 0.82, y + h / 2, h * 0.08, 0, Math.PI * 2)
+    ctx.fillStyle = '#1a1a2a'; ctx.fill()
     ctx.restore()
   } else if (frame.notch.kind === 'punchhole') {
-    const r = frame.notch.radius * scale
-    const y = frame.notch.topOffset * scale
+    const r = frame.notch.radius * scale; const y = frame.notch.topOffset * scale
     ctx.save()
-    ctx.beginPath()
-    ctx.arc(cx, y, r, 0, Math.PI * 2)
-    ctx.fillStyle = '#000'
-    ctx.fill()
-    ctx.beginPath()
-    ctx.arc(cx, y, r * 0.45, 0, Math.PI * 2)
-    ctx.fillStyle = '#0a0a1a'
-    ctx.fill()
+    ctx.beginPath(); ctx.arc(cx, y, r, 0, Math.PI * 2)
+    ctx.fillStyle = '#000'; ctx.fill()
+    ctx.beginPath(); ctx.arc(cx, y, r * 0.45, 0, Math.PI * 2)
+    ctx.fillStyle = '#0a0a1a'; ctx.fill()
     ctx.restore()
   }
 }
 
-// Draw the screen recess border (dark inner border between screen and body)
-function drawScreenRecess(
-  ctx: CanvasRenderingContext2D,
-  frame: DeviceFrame,
-  scale: number,
-) {
-  const sx = frame.screenX * scale
-  const sy = frame.screenY * scale
-  const sw = frame.screenW * scale
-  const sh = frame.screenH * scale
-  const sr = frame.screenRadius * scale
-
+function drawSlotText(ctx: CanvasRenderingContext2D, text: SlotText, slotX: number, slotY: number, slotW: number, slotH: number, canvasW: number, canvasH: number) {
+  if (!text.title && !text.subtitle) return
   ctx.save()
-  roundedRectPath(ctx, sx - 2, sy - 2, sw + 4, sh + 4, sr + 2)
-  ctx.strokeStyle = 'rgba(0,0,0,0.6)'
-  ctx.lineWidth = 3
-  ctx.stroke()
+
+  let baseX: number, baseY: number
+  const lineH = text.fontSize * 1.3
+
+  if (text.position === 'top') {
+    baseX = slotX
+    baseY = slotY - 20 - (text.subtitle ? lineH * 2 : lineH)
+  } else if (text.position === 'overlay') {
+    baseX = slotX + 16
+    baseY = slotY + slotH - 50 - (text.subtitle ? lineH * 2 : lineH)
+  } else {
+    baseX = slotX
+    baseY = slotY + slotH + 30
+  }
+
+  if (text.align === 'center') baseX = slotX + slotW / 2
+  else if (text.align === 'right') baseX = slotX + slotW
+
+  ctx.textAlign = text.align === 'center' ? 'center' : text.align === 'right' ? 'right' : 'left'
+  ctx.textBaseline = 'top'
+  ctx.fillStyle = text.color
+
+  if (text.position === 'overlay') {
+    const padding = 12
+    const tw = ctx.measureText(text.title || '').width + padding * 2
+    const th = lineH * (text.subtitle ? 2 : 1) + padding
+    const bx = slotX + (slotW - tw) / 2
+    const by = slotY + slotH - th - 16
+    ctx.fillStyle = 'rgba(0,0,0,0.55)'
+    roundedRectPath(ctx, bx, by, tw, th, 12)
+    ctx.fill()
+    ctx.fillStyle = '#fff'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'top'
+    baseX = slotX + slotW / 2
+    baseY = by + padding
+  }
+
+  ctx.font = `700 ${text.fontSize}px "Poppins", sans-serif`
+  if (text.title) ctx.fillText(text.title, baseX, baseY)
+  if (text.subtitle) {
+    ctx.font = `${text.fontSize * 0.75}px "Poppins", sans-serif`
+    ctx.globalAlpha = 0.8
+    ctx.fillText(text.subtitle, baseX, baseY + lineH)
+  }
   ctx.restore()
 }
 
-// ---- Main render ----
-
-export interface RenderOptions {
-  template: MockupTemplate
-  images: (HTMLImageElement | null)[] // indexed by slot.imageIndex
-  background: BackgroundStyle
-  fitMode: FitMode
-}
-
-export function renderMockup(
-  ctx: CanvasRenderingContext2D,
-  opts: RenderOptions,
-) {
-  const { template, images, background, fitMode } = opts
-  const { canvasW, canvasH } = template
-
-  // Reset
-  ctx.setTransform(1, 0, 0, 1, 0, 0)
-  ctx.clearRect(0, 0, canvasW, canvasH)
-
-  // Background
-  drawBackground(ctx, canvasW, canvasH, background)
-
-  // Render each slot back-to-front
-  for (const slot of template.slots) {
-    const frame = getFrame(slot.platform)
-    ctx.save()
-    ctx.translate(slot.x, slot.y)
-
-    const sx = frame.screenX * slot.scale
-    const sy = frame.screenY * slot.scale
-    const sw = frame.screenW * slot.scale
-    const sh = frame.screenH * slot.scale
-    const sr = frame.screenRadius * slot.scale
-
-    // 1. Device frame (drop shadow + bezel body with screen hole).
-    //    The shadow pass fills the full body to cast a drop shadow, so the
-    //    screen content must be drawn AFTER this to stay visible.
-    drawDeviceFrame(ctx, frame, slot.scale, !!slot.shadow)
-
-    // 2. Screen content (clipped to the rounded screen area)
-    ctx.save()
-    roundedRectPath(ctx, sx, sy, sw, sh, sr)
-    ctx.clip()
-
-    // Screen background (shows behind image or when no image)
-    ctx.fillStyle = '#0b0b0d'
-    ctx.fillRect(sx, sy, sw, sh)
-
-    const img = images[slot.imageIndex] ?? null
-    if (img) {
-      drawImageFit(
-        ctx,
-        img,
-        img.naturalWidth || img.width,
-        img.naturalHeight || img.height,
-        sx,
-        sy,
-        sw,
-        sh,
-        fitMode,
-      )
-    } else {
-      // Placeholder pattern: subtle diagonal lines + icon hint
-      drawPlaceholder(ctx, sx, sy, sw, sh, slot.imageIndex + 1)
-    }
-    ctx.restore()
-
-    // 3. Notch / camera on top of the screen content
-    drawDeviceNotch(ctx, frame, slot.scale)
-
-    ctx.restore()
-  }
-}
-
-function drawPlaceholder(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  index: number,
-) {
+function drawPlaceholder(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, index: number) {
   ctx.save()
-  // diagonal stripes
   ctx.fillStyle = '#16161a'
   ctx.fillRect(x, y, w, h)
   ctx.strokeStyle = 'rgba(255,255,255,0.04)'
@@ -336,7 +199,6 @@ function drawPlaceholder(
     ctx.lineTo(x + i + h, y + h)
     ctx.stroke()
   }
-  // index label
   ctx.fillStyle = 'rgba(255,255,255,0.18)'
   ctx.font = `bold ${Math.min(w, h) * 0.22}px sans-serif`
   ctx.textAlign = 'center'
@@ -345,20 +207,69 @@ function drawPlaceholder(
   ctx.restore()
 }
 
-// Local import to avoid circular dependency at module-eval time
-import { getDeviceFrame } from './frames'
-
-function getFrame(platform: Parameters<typeof getDeviceFrame>[0]) {
-  return getDeviceFrame(platform)
+export interface RenderOptions {
+  template: MockupTemplate
+  images: (HTMLImageElement | null)[]
+  background: BackgroundStyle
+  fitMode: FitMode
+  designStyleId: DesignStyleId
+  slotTexts: Record<number, SlotText>
 }
 
-// Export an offscreen render to a data URL
+export function renderMockup(ctx: CanvasRenderingContext2D, opts: RenderOptions) {
+  const { template, images, background, fitMode, designStyleId, slotTexts } = opts
+  const { canvasW, canvasH } = template
+
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
+  ctx.clearRect(0, 0, canvasW, canvasH)
+  drawBackground(ctx, canvasW, canvasH, background)
+
+  for (const slot of template.slots) {
+    const frame = getFrame(slot.platform)
+    ctx.save()
+    ctx.translate(slot.x, slot.y)
+
+    const sx = frame.screenX * slot.scale; const sy = frame.screenY * slot.scale
+    const sw = frame.screenW * slot.scale; const sh = frame.screenH * slot.scale
+    const sr = frame.screenRadius * slot.scale
+
+    drawDeviceFrame(ctx, frame, slot.scale, !!slot.shadow, designStyleId)
+
+    ctx.save()
+    roundedRectPath(ctx, sx, sy, sw, sh, sr)
+    ctx.clip()
+    ctx.fillStyle = '#0b0b0d'
+    ctx.fillRect(sx, sy, sw, sh)
+
+    const img = images[slot.imageIndex] ?? null
+    if (img) {
+      drawImageFit(ctx, img, img.naturalWidth || img.width, img.naturalHeight || img.height, sx, sy, sw, sh, fitMode)
+    } else {
+      drawPlaceholder(ctx, sx, sy, sw, sh, slot.imageIndex + 1)
+    }
+    ctx.restore()
+
+    drawDeviceNotch(ctx, frame, slot.scale)
+    ctx.restore()
+
+    const st = slotTexts[slot.imageIndex]
+    if (st) {
+      drawSlotText(ctx, st, slot.x, slot.y, sw, sh, canvasW, canvasH)
+    }
+  }
+}
+
+import { getDeviceFrame } from './frames'
+function getFrame(platform: Parameters<typeof getDeviceFrame>[0]) { return getDeviceFrame(platform) }
+
 export function exportCanvas(
   template: MockupTemplate,
   images: (HTMLImageElement | null)[],
   background: BackgroundStyle,
   fitMode: FitMode,
   format: 'png' | 'jpeg',
+  designStyleId: DesignStyleId,
+  slotTexts: Record<number, SlotText>,
   quality = 0.95,
 ): string {
   const canvas = document.createElement('canvas')
@@ -366,7 +277,7 @@ export function exportCanvas(
   canvas.height = template.canvasH
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('Could not get 2D context')
-  renderMockup(ctx, { template, images, background, fitMode })
+  renderMockup(ctx, { template, images, background, fitMode, designStyleId, slotTexts })
   const type = format === 'png' ? 'image/png' : 'image/jpeg'
   return canvas.toDataURL(type, quality)
 }

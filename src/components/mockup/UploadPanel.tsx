@@ -1,13 +1,13 @@
 'use client'
 
 import { useCallback, useRef, useState } from 'react'
-import { Upload, X, Plus, ImageOff } from 'lucide-react'
+import { Upload, X, Plus, ImageOff, Minus, Type } from 'lucide-react'
 import { useMockupStore, useCurrentTemplate } from '@/store/mockup-store'
 import type { UploadedImage } from '@/lib/mockup/types'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { SlotTextEditor } from './SlotTextEditor'
 
-// Read a File into an UploadedImage (with dimensions)
 function readImageFile(file: File): Promise<UploadedImage> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file)
@@ -35,13 +35,18 @@ export function UploadPanel() {
   const setImageAt = useMockupStore((s) => s.setImageAt)
   const removeImageAt = useMockupStore((s) => s.removeImageAt)
   const clearImages = useMockupStore((s) => s.clearImages)
+  const addFrame = useMockupStore((s) => s.addFrame)
+  const removeFrame = useMockupStore((s) => s.removeFrame)
+  const frameCount = useMockupStore((s) => s.frameCount)
+  const slotTexts = useMockupStore((s) => s.slotTexts)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [dragOverAll, setDragOverAll] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [editingSlot, setEditingSlot] = useState<number | null>(null)
 
-  const slots = Array.from({ length: template.imageCount }, (_, i) => i)
+  const slots = Array.from({ length: frameCount ?? template.imageCount }, (_, i) => i)
 
   const handleFiles = useCallback(
     async (files: FileList | File[], startIndex?: number) => {
@@ -60,13 +65,13 @@ export function UploadPanel() {
           const img = await readImageFile(file)
           setImageAt(idx, img)
           idx++
-          if (idx >= template.imageCount) break
+          if (idx >= (frameCount ?? template.imageCount)) break
         } catch {
           setError(`Could not load "${file.name}".`)
         }
       }
     },
-    [images, setImageAt, slots, template.imageCount],
+    [images, setImageAt, slots, frameCount, template.imageCount],
   )
 
   const onSlotDrop = (e: React.DragEvent, index: number) => {
@@ -81,21 +86,42 @@ export function UploadPanel() {
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <h3 className="text-sm font-semibold">Images</h3>
-          <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-            {filledCount}/{template.imageCount}
+          <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-medium">
+            {filledCount}/{frameCount} filled
           </span>
         </div>
-        {filledCount > 0 && (
+        <div className="flex items-center gap-1">
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
-            className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
-            onClick={clearImages}
+            className="h-7 w-7 p-0"
+            onClick={removeFrame}
+            disabled={frameCount <= 1}
+            title="Remove last frame"
           >
-            Clear all
+            <Minus className="h-3 w-3" />
           </Button>
-        )}
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 w-7 p-0"
+            onClick={addFrame}
+            disabled={frameCount >= 50}
+            title="Add frame"
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </Button>
+          {filledCount > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
+              onClick={clearImages}
+            >
+              Clear all
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Batch upload dropzone */}
@@ -143,15 +169,16 @@ export function UploadPanel() {
       <div
         className={cn(
           'grid gap-2',
-          template.imageCount <= 2
+          (frameCount ?? template.imageCount) <= 2
             ? 'grid-cols-2'
-            : template.imageCount <= 4
+            : (frameCount ?? template.imageCount) <= 4
               ? 'grid-cols-2'
               : 'grid-cols-3',
         )}
       >
         {slots.map((index) => {
           const img = images[index]
+          const hasText = !!slotTexts[index]
           return (
             <div
               key={index}
@@ -169,7 +196,6 @@ export function UploadPanel() {
                 img ? 'cursor-pointer' : 'cursor-pointer',
               )}
               onClick={() => {
-                // open file picker for this slot
                 const input = document.createElement('input')
                 input.type = 'file'
                 input.accept = 'image/*'
@@ -188,21 +214,45 @@ export function UploadPanel() {
                     className="h-full w-full object-cover"
                   />
                   <div className="absolute inset-0 flex flex-col justify-between bg-gradient-to-b from-black/40 via-transparent to-black/50 p-1.5 opacity-0 transition-opacity group-hover:opacity-100">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        removeImageAt(index)
-                      }}
-                      className="ml-auto flex h-6 w-6 items-center justify-center rounded-full bg-background/90 text-foreground shadow hover:bg-destructive hover:text-destructive-foreground"
-                      aria-label="Remove image"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
+                    <div className="flex items-start justify-between">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setEditingSlot(index)
+                        }}
+                        className={cn(
+                          'flex h-6 w-6 items-center justify-center rounded-full shadow',
+                          hasText
+                            ? 'bg-indigo-500 text-white'
+                            : 'bg-background/90 text-foreground hover:bg-indigo-500 hover:text-white',
+                        )}
+                        aria-label="Edit text"
+                      >
+                        <Type className="h-3 w-3" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          removeImageAt(index)
+                        }}
+                        className="flex h-6 w-6 items-center justify-center rounded-full bg-background/90 text-foreground shadow hover:bg-destructive hover:text-destructive-foreground"
+                        aria-label="Remove image"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                     <span className="truncate rounded bg-background/80 px-1 py-0.5 text-[9px] text-foreground">
                       {img.name}
                     </span>
                   </div>
+                  {hasText && (
+                    <span className="absolute bottom-1.5 left-1.5 rounded-full bg-indigo-500/80 px-1.5 py-0.5 text-[8px] font-medium text-white">
+                      <Type className="mr-0.5 inline h-2.5 w-2.5" />
+                      Text
+                    </span>
+                  )}
                 </>
               ) : (
                 <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-muted-foreground/60">
@@ -223,6 +273,15 @@ export function UploadPanel() {
           )
         })}
       </div>
+
+      {/* Slot text editor modal */}
+      {editingSlot !== null && (
+        <SlotTextEditor
+          slotIndex={editingSlot}
+          open
+          onClose={() => setEditingSlot(null)}
+        />
+      )}
 
       {error && (
         <p className="rounded-md bg-destructive/10 px-2 py-1.5 text-xs text-destructive">

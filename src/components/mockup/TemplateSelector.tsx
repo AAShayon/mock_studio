@@ -86,25 +86,25 @@ export function TemplateSelector() {
             className={cn(
               'group flex flex-col items-center gap-2 rounded-xl border p-3 transition-all',
               active
-                ? 'border-primary bg-primary/5 shadow-sm'
-                : 'border-border bg-card hover:border-primary/40 hover:bg-accent/40',
+                ? 'border-indigo-400 bg-indigo-500/20 shadow-sm'
+                : 'border-white/10 bg-white/5 hover:border-indigo-400/40 hover:bg-white/10',
             )}
           >
             <span
               className={cn(
                 'transition-colors',
                 active
-                  ? 'text-primary'
-                  : 'text-muted-foreground group-hover:text-foreground',
+                  ? 'text-indigo-400'
+                  : 'text-white/40 group-hover:text-white/80',
               )}
             >
               <TemplateThumb id={t.id} />
             </span>
             <div className="flex flex-col items-center gap-0.5 text-center">
-              <span className="text-xs font-semibold leading-tight">
+              <span className="text-xs font-semibold leading-tight text-white">
                 {t.name}
               </span>
-              <span className="text-[10px] text-muted-foreground">
+              <span className="text-[10px] text-white/50">
                 {t.imageCount} {t.imageCount === 1 ? 'image' : 'images'}
               </span>
             </div>

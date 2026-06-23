@@ -6,9 +6,39 @@ export type FitMode = 'cover' | 'contain' | 'stretch'
 
 export type ExportFormat = 'png' | 'jpeg'
 
+export type CanvasOrientation = 'portrait' | 'landscape'
+
 export type BackgroundStyle =
   | { type: 'solid'; color: string }
   | { type: 'gradient'; from: string; to: string; angle: number }
+
+export type DesignStyleId = 'titanium' | 'midnight' | 'gold' | 'rosegold' | 'graphite'
+
+export interface DesignStyle {
+  id: DesignStyleId
+  name: string
+  bodyTop: string
+  bodyBottom: string
+  bodyEdge: string
+  edgeHighlight: string
+}
+
+export const DESIGN_STYLES: DesignStyle[] = [
+  { id: 'titanium', name: 'Titanium', bodyTop: '#3a3a3c', bodyBottom: '#1c1c1e', bodyEdge: '#0a0a0a', edgeHighlight: '#545456' },
+  { id: 'midnight', name: 'Midnight', bodyTop: '#1a1a2e', bodyBottom: '#0f0f1a', bodyEdge: '#06060e', edgeHighlight: '#2a2a4e' },
+  { id: 'gold', name: 'Gold', bodyTop: '#c9a96e', bodyBottom: '#8b6914', bodyEdge: '#5c4510', edgeHighlight: '#e8d5a3' },
+  { id: 'rosegold', name: 'Rose Gold', bodyTop: '#e8b4b8', bodyBottom: '#c17a7e', bodyEdge: '#8e5559', edgeHighlight: '#f2d0d2' },
+  { id: 'graphite', name: 'Graphite', bodyTop: '#4a4a4a', bodyBottom: '#2a2a2a', bodyEdge: '#1a1a1a', edgeHighlight: '#6a6a6a' },
+]
+
+export interface SlotText {
+  title: string
+  subtitle: string
+  fontSize: number
+  color: string
+  position: 'top' | 'bottom' | 'overlay'
+  align: 'left' | 'center' | 'right'
+}
 
 // A device frame definition (in design pixels)
 export interface DeviceFrame {
